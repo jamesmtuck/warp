@@ -237,7 +237,12 @@ def _todo_search_response(request: str) -> list[dict]:
 
 
 def _route_request(request: str, cwd: str) -> list[dict]:
-    """Route a natural-language request to the appropriate handler."""
+    """Route a natural-language request to the appropriate handler.
+
+    Routing is ordered by specificity: text/content search (grep) is checked
+    before file-find so that "search for X in text files" is not misrouted to
+    the find handler by the overlapping `search.*file` pattern.
+    """
     req_lower = request.lower()
 
     if re.search(r"\bgrep\b|\bsearch\b.*text|\btext.*search|contains?\s", req_lower):

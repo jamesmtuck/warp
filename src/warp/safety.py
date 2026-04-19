@@ -71,7 +71,7 @@ def _check_patterns(command: str) -> tuple[str, list[str], Optional[str]]:
         warnings.append("kill -9 forcibly terminates a process without cleanup.")
 
     elif re.search(r"(?<![<>])>(?!>)", cmd) and not re.search(r"\b(echo|printf)\b", cmd):
-        # Shell overwrite redirect (not append) for non-trivial commands
+        # Single `>` redirect (not `>>` or `<>`) for non-trivial commands
         risk = RISK_MODERATE
         warnings.append("Shell redirect > will overwrite the target file.")
         safer = cmd.replace(">", ">>", 1) + "  # (changed to append; verify intent)"
