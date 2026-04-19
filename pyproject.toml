@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "warp"
+version = "0.1.0"
+description = "Local-first AI-powered terminal assistant for Bash and Zsh"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+dependencies = [
+    "typer>=0.12",
+    "tomli>=2.0; python_version < '3.11'",
+    "tomli-w>=1.0",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+openai = ["openai>=1.0"]
+dev = ["pytest>=7.0", "pytest-cov"]
+
+[project.scripts]
+warp = "warp.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
