@@ -33,10 +33,9 @@ def _get_db_path(config: WarpConfig) -> Path:
 
 
 def _ensure_db(db_path: Path) -> None:
-    """Initialize the database if it doesn't exist."""
+    """Initialize the database schema if needed."""
     from warp.db import init_db
-    if not db_path.exists():
-        init_db(db_path)
+    init_db(db_path)
 
 
 # ---------------------------------------------------------------------------
@@ -368,8 +367,9 @@ def import_history(
 # ---------------------------------------------------------------------------
 # Version
 # ---------------------------------------------------------------------------
-@app.callback()
+@app.callback(invoke_without_command=True)
 def main(
+    ctx: typer.Context = typer.Option(None, hidden=True),
     version: bool = typer.Option(False, "--version", "-V", help="Show version and exit.", is_eager=True),
 ) -> None:
     """Warp: local-first AI-powered terminal assistant."""
