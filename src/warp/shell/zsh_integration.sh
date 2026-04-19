@@ -24,11 +24,23 @@ _WARP_CMD_START=0
 _WARP_LAST_CMD=""
 
 # ---------------------------------------------------------------------------
+# Helper: millisecond timestamp, safe on macOS and Linux
+# On macOS, date +%s%3N outputs "<seconds>N" (%%N is unsupported), so we
+# strip any non-numeric characters from the output.
+# ---------------------------------------------------------------------------
+_warp_ms_timestamp() {
+    local ts
+    ts=$(date +%s%3N 2>/dev/null || echo 0)
+    ts="${ts//[^0-9]/}"
+    echo "${ts:-0}"
+}
+
+# ---------------------------------------------------------------------------
 # preexec: called by zsh before each command executes
 # ---------------------------------------------------------------------------
 _warp_preexec() {
     _WARP_LAST_CMD="$1"
-    _WARP_CMD_START=$(date +%s%3N 2>/dev/null || echo 0)
+    _WARP_CMD_START=$(_warp_ms_timestamp)
 }
 
 # ---------------------------------------------------------------------------
@@ -43,7 +55,7 @@ _warp_precmd() {
     local duration_ms=0
     if [[ "${_WARP_CMD_START}" -gt 0 ]]; then
         local now
-        now=$(date +%s%3N 2>/dev/null || echo 0)
+        now=$(_warp_ms_timestamp)
         duration_ms=$(( now - _WARP_CMD_START ))
     fi
 
