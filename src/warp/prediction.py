@@ -25,7 +25,7 @@ class PredictedCommand:
 
 
 # Maximum seconds between two commands to be considered a sequence
-_MAX_SEQUENCE_GAP_SECS = 600  # 10 minutes
+_MAX_SEQUENCE_GAP_SECONDS = 600  # 10 minutes
 
 
 def _is_valid_sequence(
@@ -51,7 +51,7 @@ def _is_valid_sequence(
         t_next = _parse_timestamp(next_ts)
         if t_prev and t_next:
             gap = (t_next - t_prev).total_seconds()
-            return 0 <= gap <= _MAX_SEQUENCE_GAP_SECS
+            return 0 <= gap <= _MAX_SEQUENCE_GAP_SECONDS
 
     return False
 

@@ -266,7 +266,7 @@ def next_command(
 ) -> None:
     """Predict and select likely next commands based on history patterns.
 
-    Warp analyses your command history to surface what you are most likely
+    Warp analyzes your command history to surface what you are most likely
     to run next, taking recent sequential patterns and the current directory
     context into account.  Select a suggestion to copy it to your prompt or
     run it directly.

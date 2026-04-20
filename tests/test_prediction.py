@@ -24,10 +24,12 @@ from warp.prediction import (
 # ---------------------------------------------------------------------------
 
 def _ts(year: int, month: int, day: int, hour: int = 0, minute: int = 0) -> str:
+    """Return an ISO 8601 UTC timestamp string (e.g. '2024-06-01T10:00:00Z')."""
     return f"{year:04d}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:00Z"
 
 
 def make_record(**kwargs) -> CaptureRecord:
+    """Create a CaptureRecord with sensible defaults, overridable via kwargs."""
     defaults = dict(
         timestamp=_ts(2024, 6, 1),
         session_id="sess1",
