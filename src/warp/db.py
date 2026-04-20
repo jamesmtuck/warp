@@ -216,3 +216,55 @@ def get_last_command_in_session(
         (session_id, cwd),
     ).fetchall()
     return rows[0] if rows else None
+
+
+def get_most_recent_command(
+    conn: sqlite3.Connection,
+    session_id: Optional[str] = None,
+) -> Optional[sqlite3.Row]:
+    """Return the single most recent command, optionally filtered by session."""
+    if session_id:
+        rows = conn.execute(
+            "SELECT * FROM commands WHERE session_id = ? ORDER BY timestamp DESC LIMIT 1",
+            (session_id,),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM commands ORDER BY timestamp DESC LIMIT 1"
+        ).fetchall()
+    return rows[0] if rows else None
+
+
+def get_command_sequences(
+    conn: sqlite3.Connection,
+    limit: int = 1000,
+) -> list[sqlite3.Row]:
+    """Return consecutive command pairs using a SQL window function.
+
+    Each row contains the previous command fields plus LEAD()-computed
+    fields for the next command in timestamp order.
+    """
+    return conn.execute(
+        """
+        SELECT
+            id             AS prev_id,
+            command_raw    AS prev_cmd,
+            command_norm   AS prev_norm,
+            verb           AS prev_verb,
+            cwd            AS prev_cwd,
+            session_id     AS prev_session_id,
+            timestamp      AS prev_ts,
+            success        AS prev_success,
+            LEAD(command_raw)  OVER w AS next_cmd,
+            LEAD(cwd)          OVER w AS next_cwd,
+            LEAD(timestamp)    OVER w AS next_ts,
+            LEAD(success)      OVER w AS next_success,
+            LEAD(repo_root)    OVER w AS next_repo_root,
+            LEAD(session_id)   OVER w AS next_session_id
+        FROM commands
+        WINDOW w AS (ORDER BY timestamp)
+        ORDER BY timestamp DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
