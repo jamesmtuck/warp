@@ -250,6 +250,86 @@ def interactive_ask(
 
 
 # ---------------------------------------------------------------------------
+# warp next
+# ---------------------------------------------------------------------------
+@app.command(name="next")
+def next_command(
+    last: Optional[str] = typer.Option(
+        None, "--last", help="The last command you ran (inferred from history if omitted)."
+    ),
+    print_only: bool = typer.Option(
+        False, "--print-only", help="Print the selected command to stdout only (for shell integration)."
+    ),
+    limit: int = typer.Option(5, "--limit", "-n", help="Number of predictions to show."),
+    cwd: Optional[str] = typer.Option(None, "--cwd", help="Override current working directory."),
+    session_id: Optional[str] = typer.Option(None, "--session-id", help="Shell session ID for context."),
+) -> None:
+    """Predict and select likely next commands based on history patterns.
+
+    Warp analyses your command history to surface what you are most likely
+    to run next, taking recent sequential patterns and the current directory
+    context into account.  Select a suggestion to copy it to your prompt or
+    run it directly.
+
+    Tip – add a shell alias for quick access:
+
+      alias wn='eval "$(warp next --print-only)"'
+    """
+    from warp.db import get_connection, get_most_recent_command, row_to_search_result
+    from warp.git_context import get_repo_root
+    from warp.prediction import predict_next_commands
+    from warp.selectors import select_from_items
+
+    config = _get_config()
+    db_path = _get_db_path(config)
+    _ensure_db(db_path)
+
+    effective_cwd = cwd or os.getcwd()
+    effective_repo_root = get_repo_root(effective_cwd)
+
+    # Infer last command from DB when not supplied on the command line
+    last_cmd = last
+    if last_cmd is None:
+        effective_session = session_id or os.environ.get("WARP_SESSION_ID")
+        with get_connection(db_path) as conn:
+            row = get_most_recent_command(conn, session_id=effective_session)
+        if row:
+            last_cmd = row_to_search_result(row).command_raw
+
+    predictions = predict_next_commands(
+        db_path=db_path,
+        config=config,
+        last_command=last_cmd,
+        cwd=effective_cwd,
+        repo_root=effective_repo_root,
+        session_id=session_id or os.environ.get("WARP_SESSION_ID"),
+        limit=limit,
+    )
+
+    if not predictions:
+        typer.echo("No predictions available yet – run more commands to build history.", err=True)
+        raise typer.Exit(1)
+
+    if not print_only:
+        if last_cmd:
+            typer.echo(f"Last command: {last_cmd}", err=True)
+        typer.echo("Predicted next commands:", err=True)
+        for i, p in enumerate(predictions, 1):
+            reasons = ", ".join(p.reasons) if p.reasons else ""
+            typer.echo(f"  [{i}] {p.command}  ({reasons})", err=True)
+        typer.echo("", err=True)
+
+    items = [p.command for p in predictions]
+    selected = select_from_items(items, prompt="Next> ", selector=config.selector)
+
+    if selected:
+        if print_only:
+            print(selected, end="")
+        else:
+            typer.echo(f"Selected: {selected}")
+
+
+# ---------------------------------------------------------------------------
 # warp capture  (internal, used by shell hooks)
 # ---------------------------------------------------------------------------
 @app.command()
