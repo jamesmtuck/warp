@@ -279,7 +279,8 @@ def next_command(
     your own key bindings:
 
       # bash: bind Ctrl-N as an alternative to the down-arrow
-      bind -x '"\\C-n": "READLINE_LINE=$(warp next --top); READLINE_POINT=${#READLINE_LINE}"'
+      _warp_ctrl_n() { local p; p=$(warp next --top 2>/dev/null); [[ -n "$p" ]] && READLINE_LINE="$p" && READLINE_POINT=${#READLINE_LINE}; }
+      bind -x '"\\C-n": _warp_ctrl_n'
     """
     from warp.db import get_connection, get_most_recent_command, row_to_search_result
     from warp.git_context import get_repo_root
