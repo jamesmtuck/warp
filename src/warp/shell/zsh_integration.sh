@@ -107,6 +107,32 @@ _warp_ask_widget() {
 }
 
 # ---------------------------------------------------------------------------
+# ZLE widget: down-arrow — next history or top prediction.
+#
+# Behaviour:
+#   • Buffer non-empty (navigating history)  →  zle down-line-or-history
+#   • Buffer empty, already at bottom of history (HISTNO unchanged after
+#     calling down-line-or-history)  →  insert top predicted command
+# ---------------------------------------------------------------------------
+_warp_next_widget() {
+    # Try to move forward in history first.
+    local histno_before=${HISTNO}
+    zle down-line-or-history
+
+    # If zle didn't move (already at the bottom) and the buffer is empty,
+    # we are at the live prompt — insert the top predicted command.
+    if [[ ${HISTNO} -eq ${histno_before} && -z "${BUFFER}" ]]; then
+        local predicted
+        predicted=$("${WARP_BIN}" next --top 2>/dev/null)
+        if [[ -n "${predicted}" ]]; then
+            BUFFER="${predicted}"
+            CURSOR=${#BUFFER}
+            zle reset-prompt
+        fi
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # Enable warp for zsh
 # ---------------------------------------------------------------------------
 warp_enable_zsh() {
@@ -118,6 +144,11 @@ warp_enable_zsh() {
     # Register ZLE widgets
     zle -N _warp_search_widget 2>/dev/null || true
     zle -N _warp_ask_widget    2>/dev/null || true
+    zle -N _warp_next_widget   2>/dev/null || true
+
+    # Bind ↓ arrow to the prediction widget (passes through to normal history
+    # navigation while mid-history; predicts only at the live empty prompt)
+    bindkey '\e[B' _warp_next_widget 2>/dev/null || true
 
     # Bind Ctrl-F to history search, Alt-A to AI ask
     bindkey '^F' _warp_search_widget 2>/dev/null || true

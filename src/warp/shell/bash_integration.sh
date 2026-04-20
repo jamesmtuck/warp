@@ -24,6 +24,10 @@ _WARP_CMD_START=0
 _WARP_LAST_CMD=""
 _WARP_LAST_EXIT=0
 
+# History-navigation offset for the arrow-key prediction widgets.
+# 0 = at the live (empty) prompt; N = N steps back in history.
+_WARP_HIST_OFFSET=0
+
 # ---------------------------------------------------------------------------
 # Capture hook: runs BEFORE each command (via DEBUG trap)
 # ---------------------------------------------------------------------------
@@ -40,6 +44,9 @@ _warp_preexec() {
 _warp_precmd() {
     local exit_code=$?
     _WARP_LAST_EXIT="${exit_code}"
+
+    # Reset history offset so down-arrow is ready to predict at the new prompt
+    _WARP_HIST_OFFSET=0
 
     # Skip if no command was run
     [[ -z "${_WARP_LAST_CMD}" ]] && return 0
@@ -65,6 +72,69 @@ _warp_precmd() {
     disown 2>/dev/null
 
     _WARP_LAST_CMD=""
+}
+
+# ---------------------------------------------------------------------------
+# Helper: extract the command text from a `history` output line.
+# Input format: "   NNN  command text"
+# ---------------------------------------------------------------------------
+_warp_hist_line_text() {
+    sed 's/^ *[0-9][0-9]* *//' <<< "$1"
+}
+
+# ---------------------------------------------------------------------------
+# Up-arrow widget: navigate backwards in history (replaces readline default).
+# We track position in _WARP_HIST_OFFSET so the down-arrow widget knows
+# whether we are mid-navigation or at the live prompt.
+# ---------------------------------------------------------------------------
+_warp_up_widget() {
+    local -a all_hist
+    mapfile -t all_hist < <(HISTTIMEFORMAT= history 2>/dev/null)
+    local hist_count=${#all_hist[@]}
+    [[ "${hist_count}" -eq 0 ]] && return
+
+    if [[ "${_WARP_HIST_OFFSET}" -lt "${hist_count}" ]]; then
+        (( _WARP_HIST_OFFSET++ ))
+        local idx=$(( hist_count - _WARP_HIST_OFFSET ))
+        READLINE_LINE=$(_warp_hist_line_text "${all_hist[$idx]}")
+        READLINE_POINT=${#READLINE_LINE}
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Down-arrow widget: navigate forward in history, or insert top prediction.
+#
+# Behaviour:
+#   _WARP_HIST_OFFSET > 1  →  move forward one step (show next history entry)
+#   _WARP_HIST_OFFSET = 1  →  return to live (empty) prompt
+#   _WARP_HIST_OFFSET = 0  →  already at live prompt: insert top prediction
+# ---------------------------------------------------------------------------
+_warp_down_widget() {
+    if [[ "${_WARP_HIST_OFFSET}" -gt 1 ]]; then
+        # Navigate forward through history
+        (( _WARP_HIST_OFFSET-- ))
+        local -a all_hist
+        mapfile -t all_hist < <(HISTTIMEFORMAT= history 2>/dev/null)
+        local hist_count=${#all_hist[@]}
+        local idx=$(( hist_count - _WARP_HIST_OFFSET ))
+        READLINE_LINE=$(_warp_hist_line_text "${all_hist[$idx]}")
+        READLINE_POINT=${#READLINE_LINE}
+    elif [[ "${_WARP_HIST_OFFSET}" -eq 1 ]]; then
+        # One more step forward returns to the live (empty) prompt
+        _WARP_HIST_OFFSET=0
+        READLINE_LINE=""
+        READLINE_POINT=0
+    else
+        # Already at the live prompt: insert the top predicted command
+        if [[ -z "${READLINE_LINE}" ]]; then
+            local predicted
+            predicted=$("${WARP_BIN}" next --top 2>/dev/null)
+            if [[ -n "${predicted}" ]]; then
+                READLINE_LINE="${predicted}"
+                READLINE_POINT=${#READLINE_LINE}
+            fi
+        fi
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -109,6 +179,10 @@ warp_enable_bash() {
     else
         PROMPT_COMMAND="_warp_precmd;${PROMPT_COMMAND}"
     fi
+
+    # Bind ↑/↓ arrows for history navigation + prediction at the live prompt
+    bind -x '"\e[A": _warp_up_widget'   2>/dev/null || true  # Up arrow
+    bind -x '"\e[B": _warp_down_widget' 2>/dev/null || true  # Down arrow
 
     # Bind Ctrl-F to warp interactive search (doesn't shadow Ctrl-R)
     bind -x '"\C-f": _warp_search_widget' 2>/dev/null || true

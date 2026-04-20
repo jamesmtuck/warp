@@ -260,6 +260,9 @@ def next_command(
     print_only: bool = typer.Option(
         False, "--print-only", help="Print the selected command to stdout only (for shell integration)."
     ),
+    top: bool = typer.Option(
+        False, "--top", help="Print only the single top prediction without any interactive selection. Designed for key-binding use."
+    ),
     limit: int = typer.Option(5, "--limit", "-n", help="Number of predictions to show."),
     cwd: Optional[str] = typer.Option(None, "--cwd", help="Override current working directory."),
     session_id: Optional[str] = typer.Option(None, "--session-id", help="Shell session ID for context."),
@@ -271,9 +274,12 @@ def next_command(
     context into account.  Select a suggestion to copy it to your prompt or
     run it directly.
 
-    Tip – add a shell alias for quick access:
+    The shell integration scripts bind the ↓ arrow key to insert the top
+    prediction instantly at an empty prompt.  You can also use --top for
+    your own key bindings:
 
-      alias wn='eval "$(warp next --print-only)"'
+      # bash: bind Ctrl-N as an alternative to the down-arrow
+      bind -x '"\\C-n": "READLINE_LINE=$(warp next --top); READLINE_POINT=${#READLINE_LINE}"'
     """
     from warp.db import get_connection, get_most_recent_command, row_to_search_result
     from warp.git_context import get_repo_root
@@ -309,6 +315,12 @@ def next_command(
     if not predictions:
         typer.echo("No predictions available yet – run more commands to build history.", err=True)
         raise typer.Exit(1)
+
+    # --top: print the single best prediction to stdout immediately, no selector.
+    # Designed to be called from key-binding widgets that need instant output.
+    if top:
+        print(predictions[0].command, end="")
+        return
 
     if not print_only:
         if last_cmd:
